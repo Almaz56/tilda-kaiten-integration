@@ -25,9 +25,10 @@ async def tilda_webhook(request: Request):
         logger.info(f"Received data from Tilda: {data}")
         
         # Здесь будет логика преобразования данных из Tilda в формат Kaiten
+        fields_text = "\n".join([f"{key}: {value}" for key, value in data.get('fields', {}).items()])
         kaiten_data = {
             "title": f"Новая заявка из формы: {data.get('formname', '')}",
-            "description": str(data.get('fields', {})),
+            "description": f"ID формы: {data.get('formid', '')}\n\nДанные формы:\n{fields_text}",
             "type": "task",
             "status": "new",
             "board_id": os.getenv("KAITEN_BOARD_ID")
