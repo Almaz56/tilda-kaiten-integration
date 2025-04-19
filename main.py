@@ -4,7 +4,7 @@ import requests
 import os
 import logging
 from dotenv import load_dotenv
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -18,14 +18,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-class FormField(BaseModel):
-    name: str
-    value: str
-
 class TildaWebhook(BaseModel):
     formid: str = Field(..., description="ID формы Tilda")
     formname: str = Field(..., description="Название формы")
-    fields: List[FormField] = Field(..., description="Поля формы")
+    fields: Dict[str, str] = Field(..., description="Поля формы в формате {'имя_поля': 'значение'}")
     tranid: Optional[str] = Field(None, description="Уникальный номер заявки")
 
 @app.post(
@@ -62,7 +58,7 @@ async def tilda_webhook(request: Request):
             )
         
         # Форматирование данных для Kaiten
-        fields_text = "\n".join([f"{field.name}: {field.value}" for field in webhook_data.fields])
+        fields_text = "\n".join([f"{key}: {value}" for key, value in webhook_data.fields.items()])
         kaiten_data = {
             "title": f"Новая заявка из формы: {webhook_data.formname}",
             "description": f"ID формы: {webhook_data.formid}\nID заявки: {webhook_data.tranid}\n\nДанные формы:\n{fields_text}",
