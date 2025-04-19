@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
+from fastapi import FastAPI, Request, HTTPException
+from pydantic import BaseModel, Field
 import requests
 import os
 import logging
 from dotenv import load_dotenv
+from typing import Dict, Optional
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -14,9 +15,9 @@ load_dotenv()
 app = FastAPI()
 
 class TildaWebhook(BaseModel):
-    formid: str
-    formname: str
-    fields: dict
+    formid: str = Field(..., description="ID формы Tilda")
+    formname: str = Field(..., description="Название формы")
+    fields: Dict[str, str] = Field(..., description="Поля формы")
 
 @app.post("/webhook/tilda")
 async def tilda_webhook(request: Request):
@@ -24,21 +25,37 @@ async def tilda_webhook(request: Request):
         data = await request.json()
         logger.info(f"Received data from Tilda: {data}")
         
-        # Здесь будет логика преобразования данных из Tilda в формат Kaiten
-        fields_text = "\n".join([f"{key}: {value}" for key, value in data.get('fields', {}).items()])
-        kaiten_data = {
-            "title": f"Новая заявка из формы: {data.get('formname', '')}",
-            "description": f"ID формы: {data.get('formid', '')}\n\nДанные формы:\n{fields_text}",
-            "type": "task",
-            "status": "new",
-            "board_id": os.getenv("KAITEN_BOARD_ID")
-        }
+        # Валидация данных
+        try:
+            webhook_data = TildaWebhook(**data)
+        except Exception as e:
+            logger.error(f"Validation error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid data format: {str(e)}")
         
-        # Отправка данных в Kaiten
+        # Проверка обязательных переменных окружения
         kaiten_api_url = os.getenv("KAITEN_API_URL")
         kaiten_api_token = os.getenv("KAITEN_API_TOKEN")
+        kaiten_board_id = os.getenv("KAITEN_BOARD_ID")
         
-        logger.info(f"Kaiten API URL: {kaiten_api_url}")
+        if not all([kaiten_api_url, kaiten_api_token, kaiten_board_id]):
+            missing_vars = []
+            if not kaiten_api_url: missing_vars.append("KAITEN_API_URL")
+            if not kaiten_api_token: missing_vars.append("KAITEN_API_TOKEN")
+            if not kaiten_board_id: missing_vars.append("KAITEN_BOARD_ID")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
+        
+        # Форматирование данных для Kaiten
+        fields_text = "\n".join([f"{key}: {value}" for key, value in webhook_data.fields.items()])
+        kaiten_data = {
+            "title": f"Новая заявка из формы: {webhook_data.formname}",
+            "description": f"ID формы: {webhook_data.formid}\n\nДанные формы:\n{fields_text}",
+            "type": "task",
+            "status": "new",
+            "board_id": kaiten_board_id
+        }
         
         headers = {
             "Authorization": f"Bearer {kaiten_api_token}",
@@ -47,13 +64,16 @@ async def tilda_webhook(request: Request):
         
         logger.info(f"Sending data to Kaiten: {kaiten_data}")
         
-        response = requests.post(
-            f"{kaiten_api_url}/api/v1/cards",
-            json=kaiten_data,
-            headers=headers
-        )
-        
-        logger.info(f"Kaiten response: {response.status_code} - {response.text}")
+        try:
+            response = requests.post(
+                f"{kaiten_api_url}/api/v1/cards",
+                json=kaiten_data,
+                headers=headers
+            )
+            response.raise_for_status()  # Проверка на ошибки HTTP
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error sending data to Kaiten: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error communicating with Kaiten: {str(e)}")
         
         response_data = response.json()
         return {
@@ -64,9 +84,11 @@ async def tilda_webhook(request: Request):
                 "url": f"{kaiten_api_url}/c/{response_data.get('uid')}"
             }
         }
-    except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
+    except HTTPException:
         raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
