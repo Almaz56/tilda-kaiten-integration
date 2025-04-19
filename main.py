@@ -4,7 +4,7 @@ import requests
 import os
 import logging
 from dotenv import load_dotenv
-from typing import Dict, Optional, List
+from typing import Dict, Optional, Any
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -18,16 +18,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-class FormField(BaseModel):
-    name: str
-    value: str
-
-class TildaWebhook(BaseModel):
-    formid: str = Field(..., description="ID формы Tilda")
-    formname: str = Field(..., description="Название формы")
-    fields: List[FormField] = Field(..., description="Поля формы")
-    tranid: Optional[str] = Field(None, description="Уникальный номер заявки")
-
 @app.post(
     "/webhook/tilda",
     summary="Обработка вебхука от Tilda",
@@ -37,14 +27,7 @@ class TildaWebhook(BaseModel):
 async def tilda_webhook(request: Request):
     try:
         data = await request.json()
-        logger.info(f"Received data from Tilda: {data}")
-        
-        # Валидация данных
-        try:
-            webhook_data = TildaWebhook(**data)
-        except Exception as e:
-            logger.error(f"Validation error: {str(e)}")
-            raise HTTPException(status_code=400, detail=f"Invalid data format: {str(e)}")
+        logger.info(f"Received raw data from Tilda: {data}")
         
         # Проверка обязательных переменных окружения
         kaiten_api_url = os.getenv("KAITEN_API_URL")
@@ -62,10 +45,10 @@ async def tilda_webhook(request: Request):
             )
         
         # Форматирование данных для Kaiten
-        fields_text = "\n".join([f"{field.name}: {field.value}" for field in webhook_data.fields])
+        fields_text = "\n".join([f"{key}: {value}" for key, value in data.items()])
         kaiten_data = {
-            "title": f"Новая заявка из формы: {webhook_data.formname}",
-            "description": f"ID формы: {webhook_data.formid}\nID заявки: {webhook_data.tranid}\n\nДанные формы:\n{fields_text}",
+            "title": "Новая заявка из формы Tilda",
+            "description": f"Данные формы:\n{fields_text}",
             "type": "task",
             "status": "new",
             "board_id": kaiten_board_id
