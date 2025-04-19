@@ -12,14 +12,23 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(
+    title="Tilda to Kaiten Integration",
+    description="API для интеграции форм Tilda с Kaiten",
+    version="1.0.0"
+)
 
 class TildaWebhook(BaseModel):
     formid: str = Field(..., description="ID формы Tilda")
     formname: str = Field(..., description="Название формы")
     fields: Dict[str, str] = Field(..., description="Поля формы")
 
-@app.post("/webhook/tilda")
+@app.post(
+    "/webhook/tilda",
+    summary="Обработка вебхука от Tilda",
+    description="Принимает данные из формы Tilda и создает карточку в Kaiten",
+    response_description="Информация о созданной карточке"
+)
 async def tilda_webhook(request: Request):
     try:
         data = await request.json()
