@@ -55,7 +55,15 @@ async def tilda_webhook(request: Request):
         
         logger.info(f"Kaiten response: {response.status_code} - {response.text}")
         
-        return {"status": "success", "kaiten_response": response.json()}
+        response_data = response.json()
+        return {
+            "status": "success",
+            "card": {
+                "id": response_data.get("id"),
+                "title": response_data.get("title"),
+                "url": f"{kaiten_api_url}/c/{response_data.get('uid')}"
+            }
+        }
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         raise
