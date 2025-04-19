@@ -1,10 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException
-from pydantic import BaseModel, Field
 import requests
 import os
 import logging
 from dotenv import load_dotenv
-from typing import Dict, Optional, Any
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
