@@ -5,7 +5,10 @@ import logging
 from dotenv import load_dotenv
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -27,19 +30,20 @@ async def tilda_webhook(request: Request):
         # Логируем информацию о запросе
         client_host = request.client.host
         headers = dict(request.headers)
-        logger.info(f"Received request from {client_host}")
-        logger.info(f"Request headers: {headers}")
+        logger.info(f"=== Новый запрос ===")
+        logger.info(f"IP клиента: {client_host}")
+        logger.info(f"Заголовки запроса: {headers}")
         
         # Получаем тело запроса
         data = await request.json()
-        logger.info(f"Received data from Tilda: {data}")
+        logger.info(f"Полученные данные: {data}")
         
         # Проверка обязательных переменных окружения
         kaiten_api_url = os.getenv("KAITEN_API_URL")
         kaiten_api_token = os.getenv("KAITEN_API_TOKEN")
         kaiten_board_id = os.getenv("KAITEN_BOARD_ID")
         
-        logger.info(f"Environment variables: KAITEN_API_URL={kaiten_api_url}, KAITEN_BOARD_ID={kaiten_board_id}")
+        logger.info(f"Переменные окружения: KAITEN_API_URL={kaiten_api_url}, KAITEN_BOARD_ID={kaiten_board_id}")
         
         if not all([kaiten_api_url, kaiten_api_token, kaiten_board_id]):
             missing_vars = []
@@ -66,7 +70,7 @@ async def tilda_webhook(request: Request):
             "Content-Type": "application/json"
         }
         
-        logger.info(f"Sending data to Kaiten: {kaiten_data}")
+        logger.info(f"Отправка данных в Kaiten: {kaiten_data}")
         
         try:
             response = requests.post(
@@ -76,11 +80,12 @@ async def tilda_webhook(request: Request):
             )
             response.raise_for_status()  # Проверка на ошибки HTTP
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error sending data to Kaiten: {str(e)}")
+            logger.error(f"Ошибка при отправке данных в Kaiten: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error communicating with Kaiten: {str(e)}")
         
         response_data = response.json()
-        logger.info(f"Response from Kaiten: {response_data}")
+        logger.info(f"Ответ от Kaiten: {response_data}")
+        logger.info("=== Запрос обработан успешно ===")
         
         return {
             "status": "success",
@@ -93,7 +98,7 @@ async def tilda_webhook(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Неожиданная ошибка: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 if __name__ == "__main__":
