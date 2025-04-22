@@ -24,6 +24,13 @@ app = FastAPI(
 )
 async def tilda_webhook(request: Request):
     try:
+        # Логируем информацию о запросе
+        client_host = request.client.host
+        headers = dict(request.headers)
+        logger.info(f"Received request from {client_host}")
+        logger.info(f"Request headers: {headers}")
+        
+        # Получаем тело запроса
         data = await request.json()
         logger.info(f"Received data from Tilda: {data}")
         
@@ -31,6 +38,8 @@ async def tilda_webhook(request: Request):
         kaiten_api_url = os.getenv("KAITEN_API_URL")
         kaiten_api_token = os.getenv("KAITEN_API_TOKEN")
         kaiten_board_id = os.getenv("KAITEN_BOARD_ID")
+        
+        logger.info(f"Environment variables: KAITEN_API_URL={kaiten_api_url}, KAITEN_BOARD_ID={kaiten_board_id}")
         
         if not all([kaiten_api_url, kaiten_api_token, kaiten_board_id]):
             missing_vars = []
@@ -71,6 +80,8 @@ async def tilda_webhook(request: Request):
             raise HTTPException(status_code=500, detail=f"Error communicating with Kaiten: {str(e)}")
         
         response_data = response.json()
+        logger.info(f"Response from Kaiten: {response_data}")
+        
         return {
             "status": "success",
             "card": {
