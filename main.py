@@ -71,6 +71,8 @@ async def tilda_webhook(request: Request):
         }
         
         logger.info(f"Отправка данных в Kaiten: {kaiten_data}")
+        logger.info(f"URL запроса: {kaiten_api_url}/api/v1/cards")
+        logger.info(f"Заголовки запроса: {headers}")
         
         try:
             response = requests.post(
@@ -78,9 +80,13 @@ async def tilda_webhook(request: Request):
                 json=kaiten_data,
                 headers=headers
             )
+            logger.info(f"Статус ответа от Kaiten: {response.status_code}")
+            logger.info(f"Текст ответа от Kaiten: {response.text}")
             response.raise_for_status()  # Проверка на ошибки HTTP
         except requests.exceptions.RequestException as e:
             logger.error(f"Ошибка при отправке данных в Kaiten: {str(e)}")
+            logger.error(f"URL запроса: {kaiten_api_url}/api/v1/cards")
+            logger.error(f"Заголовки запроса: {headers}")
             raise HTTPException(status_code=500, detail=f"Error communicating with Kaiten: {str(e)}")
         
         response_data = response.json()
